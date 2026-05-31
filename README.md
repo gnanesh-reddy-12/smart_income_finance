@@ -1,26 +1,37 @@
 # Smart Finance Dashboard
 
-A modern personal finance analyzer built with Flask, HTML, CSS, and JavaScript.
+Employee personal finance analyzer — **React** frontend + **Flask** API.
 
-## Features
+## Project layout
 
-- Better responsive UI with clean dashboard cards
-- Expense visualization with a doughnut chart
-- Financial health score (0-100)
-- Smart recommendations based on spending behavior
-- API-first structure for easy future improvements
-
-## Run locally
-
-```bash
-pip install -r requirements.txt
-python app.py
+```text
+Salary-Prediction/
+├── backend/           # Flask API (auth, analyze)
+├── frontend/          # React + Vite (UI)
+└── ml_pipeline/       # Future ML features
 ```
 
-Open [http://127.0.0.1:5000](http://127.0.0.1:5000).
+## Quick start (development)
 
-## Deploy on Vercel
+```bash
+pip install -r backend/requirements.txt
+python backend/app.py
+```
 
-1. Push this repository to GitHub.
-2. Import the repository in [Vercel](https://vercel.com/).
-3. Vercel will detect `vercel.json` and deploy the Flask app automatically.
+In another terminal:
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+Open [http://localhost:5173](http://localhost:5173).
+
+## Pages (React)
+
+| Route | Screen |
+|-------|--------|
+| `/login` | Sign in |
+| `/register` | Create account |
+| `/dashboard` | Sidebar: Overview · Analyze month · Insights |
