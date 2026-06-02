@@ -60,9 +60,6 @@ def _cors_origins() -> list[str]:
         origins.append(f"https://{vercel_url}")
     return [o.strip() for o in origins if o.strip()]
 
-
-USERS_FILE = BACKEND / "data" / "users.json"
-
 CATEGORIES = [
     ("rent", "Rent"),
     ("food", "Food"),
@@ -88,24 +85,31 @@ def add_cors_headers(response):
 def api_options(_path):
     return "", 204
 
-
-def _load_users() -> dict:
-    if not USERS_FILE.exists():
-        return {}
-    return json.loads(USERS_FILE.read_text(encoding="utf-8"))
-
-
-def _save_users(users: dict) -> None:
-    USERS_FILE.parent.mkdir(parents=True, exist_ok=True)
-    USERS_FILE.write_text(json.dumps(users, indent=2), encoding="utf-8")
-
-
 def _current_user():
     user_id = session.get("user_id")
     if not user_id:
         return None
-    users = _load_users()
-    return users.get(user_id)
+
+    conn = get_db()
+    cur = conn.cursor()
+
+    cur.execute(
+        "SELECT email, name FROM users WHERE email = %s",
+        (user_id,)
+    )
+
+    row = cur.fetchone()
+
+    cur.close()
+    conn.close()
+
+    if not row:
+        return None
+
+    return {
+        "email": row[0],
+        "name": row[1]
+    }
 
 
 def _user_payload(user: dict) -> dict:
@@ -225,23 +229,51 @@ def register():
 
     if not name or not email or not password:
         return jsonify({"error": "Name, email, and password are required."}), 400
+
     if len(password) < 8:
         return jsonify({"error": "Password must be at least 8 characters."}), 400
 
-    users = _load_users()
-    if any(u.get("email") == email for u in users.values()):
-        return jsonify({"error": "An account with this email already exists."}), 409
+    conn = get_db()
+    cur = conn.cursor()
 
-    user_id = email
-    users[user_id] = {
-        "name": name,
-        "email": email,
-        "password_hash": generate_password_hash(password),
-    }
-    _save_users(users)
+    cur.execute(
+        "SELECT email FROM users WHERE email = %s",
+        (email,)
+    )
 
-    session["user_id"] = user_id
-    return jsonify({"ok": True, "user": _user_payload(users[user_id])})
+    if cur.fetchone():
+        cur.close()
+        conn.close()
+        return jsonify(
+            {"error": "An account with this email already exists."}
+        ), 409
+
+    cur.execute(
+        """
+        INSERT INTO users (email, name, password_hash)
+        VALUES (%s, %s, %s)
+        """,
+        (
+            email,
+            name,
+            generate_password_hash(password)
+        )
+    )
+
+    conn.commit()
+
+    cur.close()
+    conn.close()
+
+    session["user_id"] = email
+
+    return jsonify({
+        "ok": True,
+        "user": {
+            "name": name,
+            "email": email
+        }
+    })
 
 
 @app.post("/api/auth/login")
@@ -250,13 +282,44 @@ def login():
     email = (payload.get("email") or "").strip().lower()
     password = payload.get("password") or ""
 
-    users = _load_users()
-    user = users.get(email)
-    if not user or not check_password_hash(user["password_hash"], password):
-        return jsonify({"error": "Invalid email or password."}), 401
+    conn = get_db()
+    cur = conn.cursor()
 
-    session["user_id"] = email
-    return jsonify({"ok": True, "user": _user_payload(user)})
+    cur.execute(
+        """
+        SELECT email, name, password_hash
+        FROM users
+        WHERE email = %s
+        """,
+        (email,)
+    )
+
+    row = cur.fetchone()
+
+    cur.close()
+    conn.close()
+
+    if not row:
+        return jsonify(
+            {"error": "Invalid email or password."}
+        ), 401
+
+    db_email, db_name, password_hash = row
+
+    if not check_password_hash(password_hash, password):
+        return jsonify(
+            {"error": "Invalid email or password."}
+        ), 401
+
+    session["user_id"] = db_email
+
+    return jsonify({
+        "ok": True,
+        "user": {
+            "name": db_name,
+            "email": db_email
+        }
+    })
 
 
 @app.post("/api/auth/logout")
