@@ -50,6 +50,22 @@ def db_test():
 
     return {"database": "connected", "result": result[0]}
 
+@app.get("/api/users")
+def get_users():
+    conn = get_db()
+    cur = conn.cursor()
+
+    cur.execute(
+        "SELECT email, name FROM users"
+    )
+
+    users = cur.fetchall()
+
+    cur.close()
+    conn.close()
+
+    return jsonify(users)
+
 def _cors_origins() -> list[str]:
     origins = os.environ.get(
         "CORS_ORIGINS",
