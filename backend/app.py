@@ -3,6 +3,9 @@ import os
 from functools import wraps
 from pathlib import Path
 
+import psycopg2
+from psycopg2.extras import RealDictCursor
+
 from flask import Flask, jsonify, request, send_from_directory, session
 from werkzeug.security import check_password_hash, generate_password_hash
 
@@ -12,6 +15,29 @@ FRONTEND_DIST = ROOT / "frontend" / "dist"
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", "dev-change-me-in-production")
+
+DATABASE_URL = os.environ.get("DATABASE_URL")
+
+def get_db():
+    return psycopg2.connect(DATABASE_URL)
+
+def init_db():
+    conn = get_db()
+    cur = conn.cursor()
+
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS users (
+            email TEXT PRIMARY KEY,
+            name TEXT NOT NULL,
+            password_hash TEXT NOT NULL
+        )
+    """)
+
+    conn.commit()
+    cur.close()
+    conn.close()
+
+init_db()
 
 def _cors_origins() -> list[str]:
     origins = os.environ.get(
