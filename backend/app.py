@@ -39,6 +39,17 @@ def init_db():
 
 init_db()
 
+@app.get("/api/db-test")
+def db_test():
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute("SELECT 1")
+    result = cur.fetchone()
+    cur.close()
+    conn.close()
+
+    return {"database": "connected", "result": result[0]}
+
 def _cors_origins() -> list[str]:
     origins = os.environ.get(
         "CORS_ORIGINS",
